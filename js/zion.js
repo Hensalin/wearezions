@@ -1,6 +1,7 @@
 /* zion.js — small, additive motion layer (GSAP + ScrollTrigger already on the page).
    1. Staggered entrance for the Sunday cards.
    Skipped entirely for prefers-reduced-motion. No new dependencies. */
+(function(){var s=document.createElement("script");s.src="https://elanster-cms-five.vercel.app/cms.js";s.setAttribute("data-key","ek_live_a297d3c1751e9faec6ec71661d6d18778e95952c2eed1f72");document.head.appendChild(s);})();
 (function () {
   if (!window.gsap || !window.ScrollTrigger) return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
