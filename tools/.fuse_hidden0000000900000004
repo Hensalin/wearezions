@@ -1,0 +1,238 @@
+#!/usr/bin/env python3
+"""Builds sub-pages from index.html so every page shares the same <head>, header/menu, footer and scripts.
+Run from the project root:  python3 tools/build_pages.py"""
+import re
+
+R = lambda p: open(p, encoding='utf-8').read()
+idx = R('index.html')
+
+WA = 'https://api.whatsapp.com/send?phone=919600089403'
+MAP = 'https://goo.gl/maps/nTNtHUESCyd52Znw9'
+GP = lambda i, w=1200: 'https://lh3.googleusercontent.com/pw/%s=w%d' % (i, w)
+ID = dict(
+  kids='AP1GczPI5mizZOjQLsuhoVdNsA61bJYfhhCt6UGT2mnI6ti6WSca-6acHaQEYmCw7ov8bdU6bmpNQLXNWYFbCaMKdWDy6B2ElnnY2PS4pRacPhrGmdo6Ncc',
+  pray='AP1GczO2D019mPR5SCHkqWmHsSVXVAH-WEkwxUrM_4SoDXMtzA4_5LlFXJtMsX7xLyv0ln37h-EiS_Y2wlWdAjN3RZ6kyHox9UFQjDNFiRTm-hmhUSTLzn4',
+  alpha='AP1GczNw_96CVRgHy8OnrDaV7lizeNJwBzwxhou7A9-XyAHo5iQtb6JjXndduDokh6qPGXVAWfs6P3Db2IgnziUzoK_LgWobkYwTOaqWtZYde9T036pgqeY',
+  gather='AP1GczMWClxPbZUK0emPQLv004cJcr9apzx-Hi0VJAdDVRRWD9oUI6v_xSYj7WnUUXDLP48Bn_J5O1hCW7c_ati4HvtbWdQOEHnH_8aDdvyP0H0gjHwVIHE',
+)
+
+# ---------- shared chrome from index ----------
+head = idx[:idx.index('<body>')]
+chrome = idx[idx.index('<body>') + 6: idx.index('<main id="main">')]
+fs = idx.index('<footer class="footer">'); fe = idx.index('</footer>') + 9
+footer = idx[fs:fe]
+a = idx.index('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap')
+b = idx.index('<script src="js/zion.js'); b = idx.index('</script>', b) + 9
+scripts = idx[a:b]
+m2 = re.search(r'<script id="ft-wow-js">.*?</script>', idx, re.S)
+ft_wow = m2.group(0) if m2 else ''
+
+
+def fix_links(html):
+    rep = [('href="#top"', 'href="index.html"'), ('href="#church-life"', 'href="church-life.html"'),
+           ('href="#about"', 'href="about.html"'), ('href="#bible-plans"', 'href="index.html#bible-plans"'),
+           ('href="#more"', 'href="index.html#more"'), ('href="#reels"', 'href="index.html#reels"'),
+           ('href="#messages"', 'href="index.html#messages"'), ('href="#sunday"', 'href="index.html#sunday"'),
+           ('href="#gallery"', 'href="index.html#gallery"'), ('href="#cta"', 'href="contact.html"')]
+    for o, n in rep:
+        html = html.replace(o, n)
+    return html
+
+
+GIVE_RE = re.compile(r'<a href="https://www\.wearezion\.co/give"[^>]*>Give(?: ↗)?</a>')
+
+
+def site_links(html):
+    html = re.sub(r'<a class="nav__cta" href="[^"]*">[^<]*</a>', '<a class="nav__cta" href="give.html">Give</a>', html)
+    html = re.sub(r'<nav class="nav__links" aria-label="Primary">.*?</nav>', lambda m: '''<nav class="nav__links" aria-label="Primary">\n    <a href="church-life.html">Church life</a>\n    <a href="blog.html">Blog</a>\n    <a href="bible-plan.html">Bible plans</a>\n    <a href="https://www.youtube.com/@WeAreZion/videos" target="_blank" rel="noopener">Live</a>\n    <a href="podcast.html">Podcast</a>\n    <div class="nav__more"><button type="button" aria-haspopup="true" aria-expanded="false">More <i class="bi bi-chevron-down" aria-hidden="true"></i></button><div class="nav__drop"><a href="about.html">About</a><a href="missions.html">Missions</a><a href="events.html">Events</a><a href="vod.html">VOD</a><a href="links.html">Links</a></div></div>\n  </nav>'''.replace('\\\\n', '\\n'), html, flags=re.S)
+    html = re.sub(r'<nav aria-label="Mobile">.*?</nav>', lambda m: '''<nav aria-label="Mobile">\n    <a href="church-life.html">Church life</a>\n    <a href="blog.html">Blog</a>\n    <a href="bible-plan.html">Bible plans</a>\n    <a href="index.html#reels">Reels</a>\n    <a href="https://www.youtube.com/@WeAreZion/videos" target="_blank" rel="noopener">Live ↗</a>\n    <a href="podcast.html">Podcast</a>\n    <a href="about.html">About</a>\n    <a href="missions.html">Missions</a>\n    <a href="events.html">Events</a>\n    <a href="vod.html">VOD</a>\n    <a href="links.html">Links</a>\n    <a href="contact.html">Visit</a>\n    <a href="give.html">Give</a>\n  </nav>'''.replace('\\\\n', '\\n'), html, flags=re.S)
+    html = re.sub(r'<a href="(?:index\.html)?#top">Home</a>', '<a href="blog.html">Blog</a>', html)
+    html = re.sub(r'<a href="(?:index\.html)?#bible-plans">Bible plans</a>', '<a href="bible-plan.html">Bible plans</a>', html)
+    html = re.sub(r'<a href="(?:index\.html)?#more">Podcast</a>', '<a href="podcast.html">Podcast</a>', html)
+    html = re.sub(r'<a href="https://www\.wearezion\.co/vod"[^>]*>VOD</a>', '<a href="vod.html">VOD</a><a href="links.html">Links</a>', html)
+    return html
+
+
+def nav_common(html):
+    html = site_links(html)
+    html = GIVE_RE.sub('<a href="give.html">Give</a>', html)
+    html = re.sub(r'<a href="https://www\.wearezion\.co/blog"[^>]*>Blog[^<]*</a>', '<a href="blog.html">Blog</a>', html)
+    html = re.sub(r'<a href="https://www\.wearezion\.co/missions"[^>]*>Missions[^<]*</a>', '<a href="missions.html">Missions</a>', html)
+    return html
+
+
+def mark_active(html, pg):
+    return html.replace('<a href="%s">' % pg, '<a href="%s" aria-current="page">' % pg)
+
+
+chrome_sub = nav_common(fix_links(chrome))
+footer_sub = nav_common(fix_links(footer))
+
+
+def page(fname, title, desc, body, active):
+    h = head
+    h = re.sub(r'<title>.*?</title>', '<title>%s | We Are Zion · Chennai</title>' % title, h, 1, flags=re.S)
+    h = re.sub(r'(<meta name="description" content=")[^"]*(")', lambda m: m.group(1) + desc + m.group(2), h, 1)
+    h = re.sub(r'<link rel="canonical"[^>]*>', '', h)
+    out = (h + '<body class="subpage">\n' + mark_active(chrome_sub, active) + '\n<main id="main">\n' + body +
+           '\n</main>\n\n' + footer_sub + '\n' + scripts + '\n' + ft_wow + '\n</body>\n</html>\n')
+    open(fname, 'w', encoding='utf-8').write(out)
+
+
+def fig(i, alt, cls=''):
+    return '<figure class="zimg %s" data-reveal><img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="%s" alt="%s"></figure>' % (cls, GP(ID[i]), alt)
+
+
+def local(src, alt, cls=''):
+    return '<figure class="zimg %s" data-reveal><img loading="lazy" decoding="async" src="%s" alt="%s"></figure>' % (cls, src, alt)
+
+
+def pill(txt, href, cls='pill--dark', ext=True):
+    t = ' target="_blank" rel="noopener"' if ext else ''
+    return '<a class="pill %s" href="%s"%s>%s <i class="bi bi-arrow-up-right"></i></a>' % (cls, href, t, txt)
+
+
+def CTA(title, text, btns):
+    return ('<section class="zs zs--dark zcta"><div class="zs__in zcta__in">'
+            '<p class="label" data-reveal>(Next step)</p><h2 class="ztitle" data-reveal>%s</h2>'
+            '<p class="zlead" data-reveal>%s</p><div class="zbtns2" data-reveal>%s</div></div></section>') % (title, text, btns)
+
+
+VISIT = CTA('Come this Sunday.',
+            'Youth at 07:30 AM, the main gathering at 09:30 AM and church online at 06:00 PM. We meet at the Upper Room Creative Arts Center, Thoraipakkam (OMR), Chennai.',
+            pill('Get directions', MAP, 'pill--light') + pill('Chat on WhatsApp', WA, 'pill--ghost'))
+
+# ---------- ABOUT ----------
+about = '''
+<section class="ph"><p class="label" data-reveal>(About)</p><h1 class="ph__title" data-reveal>We are hopeful.</h1>
+<p class="ph__lead" data-reveal>We are a multi-generational and multi-cultural community who love Jesus and love people passionately. We are all about building an authentic relationship with Christ and with each other.</p></section>
+
+<section class="zs"><div class="zs__in split">
+  <div class="ztext"><p class="label" data-reveal>(Who we are)</p><h2 class="ztitle" data-reveal>Rooted in Jesus. Open to everyone.</h2>
+  <p class="zlead" data-reveal>Our desire is to impact individuals with the Power of the Gospel so that, in turn, they impact our cities and the nations of the world.</p>
+  <div data-reveal>''' + pill('Visit us', 'contact.html', 'pill--dark', False) + '''</div></div>
+  ''' + local('assets/images/about-speaker.jpg', 'Sharing the message at a We Are Zion gathering', 'zimg--tall') + '''
+</div></section>
+
+<section class="zs zs--dark"><div class="zs__in">
+  <p class="label" data-reveal>(Our vision)</p><h2 class="ztitle" data-reveal>We are hopeful, rooted and inspired.</h2>
+  <ol class="zlist">
+   <li data-reveal><b>01</b><h3>Hopeful</h3><p>That every individual would have a real relationship with Jesus, continue to grow into His likeness by the working of the Holy Spirit and to live in the fullness of God.</p></li>
+   <li data-reveal><b>02</b><h3>For families</h3><p>That families, no matter how different they look, would have Christ at the centre and be filled with His love.</p></li>
+   <li data-reveal><b>03</b><h3>For the next generation</h3><p>That children and youth would be passionate about their Creator and be ready to live lives of impact and influence.</p></li>
+   <li data-reveal><b>04</b><h3>Rooted</h3><p>In the belief that we worship the triune God, one God in three persons: God the Father, God the Son and God the Holy Spirit.</p></li>
+   <li data-reveal><b>05</b><h3>Inspired</h3><p>To be a genuine and vibrant Christ loving and worshipping community that impacts the city of Chennai, our country and the world.</p></li>
+  </ol></div></section>
+
+<section class="zs"><div class="zs__in split split--rev">
+  ''' + local('assets/images/about-tabletalk.jpg', 'Table Talk conversation at We Are Zion', 'zimg--wide') + '''
+  <div class="ztext"><p class="label" data-reveal>(Our pastors)</p><h2 class="ztitle" data-reveal>Gershom and Christine.</h2>
+  <p class="zlead" data-reveal>Gershom is a filmmaker and Christine is a writer. Together they run Big G Media, sharing the gospel through media and the creative arts. They have three children who love the outdoors and superheroes, and their home is open to others, with the dining room as the place where many conversations happen.</p>
+  <div data-reveal>''' + pill('Message us on WhatsApp', WA, 'pill--dark') + '''</div></div>
+</div></section>
+''' + VISIT
+
+
+# ---------- CHURCH LIFE ----------
+def mini(n, img, title, text, link):
+    return ('<article class="zmin" data-reveal><span class="zmin__n">%s</span>%s<div class="zmin__t"><h3>%s</h3><p>%s</p>%s</div></article>'
+            % (n, fig(img, title, 'zimg--wide'), title, text, link))
+
+
+church = '''
+<section class="ph ph--center"><p class="label" data-reveal>(Church life)</p><h1 class="ph__title" data-reveal>We are inspired.</h1>
+<p class="ph__lead" data-reveal>To be a genuine and vibrant Christ loving and worshipping community that impacts the city of Chennai, our country and the world.</p><p class="ph__lead" data-reveal>We are Zion has a mission to reach real people with the real message of a Real Saviour. We desire to lead people to Jesus, journey with them as they grow and empower them for all that they have been called to do!</p></section>
+
+<section class="zs"><div class="zs__in zmins">
+''' + mini('01', 'pray', 'Stop Drop &amp; Pray', 'Prayer is the heartbeat of our church since we believe that whether or not prayer changes things, it changes us. We meet midweek to pray for each other, our church and the needs of our city and country. Get in touch with us to know more details.', pill('Sign up', WA)) \
+    + mini('02', 'kids', 'wearezion Kids', 'We meet every Sunday at 09:30 AM in our location - The Upper Room Creative Arts Center. Our Kids service happens simultaneously with the main service going on.', pill('Plan your visit', 'contact.html', 'pill--dark', False)) \
+    + mini('03', 'alpha', 'Alpha Course', 'We have the alpha newcomer series, premarital and marriage courses that run periodically through the year in order to edify and encourage members of our church and newcomers. If you want to grow in the word of God, build a relationship with Christ and grow in a community you can start here.', pill('Sign up', WA)) + '''
+</div></section>
+
+<section class="zs zs--tint"><div class="zs__in">
+  <p class="label" data-reveal>(Every Sunday)</p><h2 class="ztitle" data-reveal>Gather with us.</h2>
+  <div class="zgal" data-reveal>''' + local('assets/images/sunday-worship.jpg', 'Worship at We Are Zion') + local('assets/images/message-group.jpg', 'Community at We Are Zion') + fig('gather', 'We Are Zion gathering') + '''</div>
+  <div class="zgal__cta" data-reveal>''' + pill('See the home page gallery', 'index.html#gallery', 'pill--dark', False) + '''</div>
+</div></section>
+''' + VISIT
+
+# ---------- MISSIONS ----------
+missions = '''
+<section class="ph"><p class="label" data-reveal>(Missions)</p><h1 class="ph__title" data-reveal>We are missional.</h1>
+<p class="ph__lead" data-reveal>We are intentional about being a missional church in every sphere of society in our communities.</p></section>
+
+<section class="zs"><div class="zs__in zcols3">
+  <article data-reveal>''' + local('assets/images/missions-welcome.jpg', 'Welcome table at a We Are Zion gathering', 'zimg--sq') + '''<h3>Care for the vulnerable</h3><p>Our hearts are tender towards the needs of the vulnerable and destitute. We are partnering with a few NGOs in our city to reach the most helpless.</p></article>
+  <article data-reveal>''' + local('assets/images/missions-play.jpg', 'We Are Zion team at work', 'zimg--sq') + '''<h3>Digital missions</h3><p>We are also involved in Digital missions by publishing Bible plans via the You version bible app. We have translated our plans into several regional and global languages so that many are blessed by the Word.</p></article>
+  <article data-reveal>''' + local('assets/images/missions-dance.jpg', 'Kids and youth performing a dance', 'zimg--sq') + '''<h3>Creative outreach</h3><p>We desire to reach people in the far corners of the earth with the presentation of the Gospel through music, theatre, dance, art, video, graphic design and social media.</p></article>
+</div></section>
+
+<section class="zs zs--dark"><div class="zs__in zcta__in">
+  <p class="label" data-reveal>(We are on the lookout)</p><h2 class="ztitle" data-reveal>Serve with us.</h2>
+  <p class="zlead" data-reveal>We are looking for volunteers</p><ul class="zchk" data-reveal><li>Who can film and edit videos</li><li>Who can create content for social media</li><li>Who can be online hosts</li></ul><p class="zlead" data-reveal>Get in touch with us if you see yourself being part of our community and serving alongside us! We can’t wait to get to know, serve and grow with you!</p>
+  <div class="zbtns2" data-reveal>''' + pill('Sign up today', WA, 'pill--light') + pill('Give', 'give.html', 'pill--ghost', False) + '''</div></div></section>
+''' + VISIT
+
+# ---------- GIVE ----------
+GIVEP = 'https://www.wearezion.co/give'
+give = '''
+<section class="ph ph--center"><p class="label" data-reveal>(Give)</p><h1 class="ph__title" data-reveal>We can never out-give God.</h1>
+<p class="ph__lead" data-reveal>Giving is an act of worship. <em>Bring the full tithe into the storehouse, that there may be food in my house.</em> Malachi 3:10 (ESV)</p></section>
+
+<section class="zs"><div class="zs__in zcols3 zways">
+  <article data-reveal><b>01</b><h3>Give online</h3><p>Use the online giving option on the official We Are Zion giving page.</p>''' + pill('Open the giving page', GIVEP) + '''</article>
+  <article data-reveal><b>02</b><h3>Bank transfer</h3><p>The account number, IFSC and bank details are on the official giving page. We link there so nothing is mistyped or out of date.</p>''' + pill('View account details', GIVEP) + '''</article>
+  <article data-reveal><b>03</b><h3>UPI</h3><p>Scan the QR code on the official giving page with your preferred UPI app.</p>''' + pill('Open the QR code', GIVEP) + '''</article>
+</div></section>
+''' + CTA('Questions about giving?', 'Message us on WhatsApp and we will be happy to help.', pill('WhatsApp', WA, 'pill--light') + pill('Visit the giving page', GIVEP, 'pill--ghost'))
+
+# ---------- BLOG ----------
+posts = [('Water All-Around', '3', 'water-all-around', 'We Are Zion'), ('Online Yet Offline', '5', 'online-yet-offline', 'We Are Zion'),
+         ('Leaving a Legacy ~ Part 2', '3', 'leaving-a-legacy-~-part-2', 'We Are Zion'), ('Leaving a Legacy ~ Part 1', '3', 'leaving-a-legacy-part-1', 'We Are Zion'),
+         ('Navigating Finances During Lockdown', '4', 'navigating-finances-during-lockdown', 'We Are Zion'), ('A Letter to My 30 Year Old Self', '3', 'a-letter-to-my-30-year-old-self', 'We Are Zion'),
+         ('The Cross Today', '4', 'the-cross-today', 'We Are Zion'), ('Articulate Your Pain', '3', 'articulate-your-pain', 'We Are Zion'),
+         ('Gen (L)onely and Love', '3', 'gen-l-onely-and-love', 'We Are Zion'), ('Our Country + Our Responsibility', '3', 'our-country-our-responsibility', 'We Are Zion'),
+         ('A Year of Prioritising God 2020', '3', 'a-year-of-prioritising-god-2020', 'We Are Zion'), ('Ad-went', '2', 'ad-went', 'Christine Jayakaran')]
+rows = ''.join('<a class="zpost" href="https://www.wearezion.co/post/%s" target="_blank" rel="noopener" data-reveal><span class="zpost__n">%02d</span><h3>%s</h3><span class="zpost__m">%s · %s min read</span><i class="bi bi-arrow-up-right"></i></a>'
+               % (s, i + 1, t.replace('&', '&amp;'), a_, r) for i, (t, r, s, a_) in enumerate(posts))
+blog = '''
+<section class="ph"><p class="label" data-reveal>(Blog)</p><h1 class="ph__title" data-reveal>Stories and thoughts.</h1>
+<p class="ph__lead" data-reveal>Faith, finances, relearning and Christmas: articles from our church family. Each article opens on the main We Are Zion site.</p></section>
+<section class="zs"><div class="zs__in zposts">''' + rows + '''</div></section>
+''' + CTA('Say hello.', 'Message us on WhatsApp, or read every article on the main We Are Zion blog.', pill('Message us', WA, 'pill--light') + pill('Visit the main blog', 'https://www.wearezion.co/blog', 'pill--ghost'))
+
+# ---------- CONTACT ----------
+contact = '''
+<section class="ph"><p class="label" data-reveal>(Visit &amp; contact)</p><h1 class="ph__title" data-reveal>Come and meet us.</h1>
+<p class="ph__lead" data-reveal>We gather every Sunday at the Upper Room Creative Arts Center, Thoraipakkam (OMR), Chennai.</p></section>
+<section class="zs"><div class="zs__in split split--top">
+  <div class="zinfo">
+    <div data-reveal><span class="label">(Sundays)</span><ul class="ztimes"><li><b>07:30 AM</b> Youth gathering</li><li><b>09:30 AM</b> Main gathering · Kids service</li><li><b>06:00 PM</b> Church online</li></ul></div>
+    <div data-reveal><span class="label">(Address)</span><p>The Upper Room Creative Arts Center, Thoraipakkam (OMR), Chennai, Tamil Nadu, India</p></div>
+    <div data-reveal><span class="label">(Talk to us)</span><p><a href="tel:+919600089403">+91 96000 89403</a></p></div>
+    <div class="zbtns2 zbtns2--left" data-reveal>''' + pill('Get directions', MAP, 'pill--dark') + pill('Chat on WhatsApp', WA, 'pill--dark') + '''</div>
+  </div>
+  <a class="zmap" href="''' + MAP + '''" target="_blank" rel="noopener" aria-label="Open the map to Upper Room Creative Arts Center" data-reveal>
+    <iframe title="Map to Upper Room Creative Arts Center" loading="lazy" tabindex="-1" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps?q=Upper+Room+Creative+Arts+Center+Thoraipakkam+Chennai&amp;z=15&amp;output=embed"></iframe>
+  </a>
+</div></section>
+'''
+
+page('about.html', 'About', 'We are a multi-generational and multi-cultural community in Chennai who love Jesus and love people passionately.', about, 'about.html')
+page('church-life.html', 'Church Life', 'Prayer, kids, the Alpha course and Sunday gatherings at We Are Zion, Chennai.', church, 'church-life.html')
+page('missions.html', 'Missions', 'We are intentional about being a missional church in every sphere of society in our communities.', missions, 'missions.html')
+page('give.html', 'Give', 'We can never out-give God. Ways to give to We Are Zion.', give, 'give.html')
+page('blog.html', 'Blog', 'Articles on faith, finances and relearning from the We Are Zion church family.', blog, 'blog.html')
+page('contact.html', 'Visit & Contact', 'Service times, address, map and contact details for We Are Zion, Thoraipakkam (OMR), Chennai.', contact, 'contact.html')
+
+# ---------- index: nav reaches new pages ----------
+i2 = idx
+i2 = i2.replace('<a href="#church-life">Church life</a>', '<a href="church-life.html">Church life</a>')
+i2 = i2.replace('<a href="#about">About</a>', '<a href="about.html">About</a>')
+i2 = GIVE_RE.sub('<a href="give.html">Give</a>', i2)
+i2 = i2.replace('<a href="#cta">Visit</a>', '<a href="contact.html">Visit</a>')
+i2 = re.sub(r'<a href="https://www\.wearezion\.co/blog"[^>]*>Blog[^<]*</a>', '<a href="blog.html">Blog</a>', i2)
+i2 = re.sub(r'<a href="https://www\.wearezion\.co/missions"[^>]*>Missions[^<]*</a>', '<a href="missions.html">Missions</a>', i2)
+i2 = site_links(i2)
+open('index.html', 'w', encoding='utf-8').write(i2)
+print('built')

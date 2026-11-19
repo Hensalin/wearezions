@@ -1,0 +1,220 @@
+/* =====================================================================
+   zion.css — design tokens, rhythm and site-wide section components.
+   Loaded after style.css + extras.css. Single source of truth for:
+   container, gutter, section spacing, type scale, radii, section titles.
+   ===================================================================== */
+
+/* ---------- 1. Tokens ---------- */
+:root{
+  /* layout */
+  --z-container:calc(1400px + 2*var(--z-gutter));
+  --z-gutter:var(--pad);                        /* 16 → 48px, from style.css */
+  --z-section-y:clamp(56px,6vw,88px);          /* shared vertical rhythm */
+  --z-gap:clamp(16px,1.6vw,28px);               /* card / grid gap */
+  --z-head-gap:clamp(14px,1.6vw,22px);          /* label → title → copy */
+  /* radius */
+  --z-r-sm:14px; --z-r-md:20px; --z-r-lg:28px;
+  /* type scale (display = Anton, body = Be Vietnam Pro, mono = labels) */
+  --z-h2-xl:clamp(44px,8vw,128px);              /* statement-style headers */
+  --z-h2:clamp(38px,6vw,88px);                  /* standard section title */
+  --z-h2-sm:clamp(30px,4.2vw,64px);             /* long-sentence titles */
+  --z-h3:clamp(22px,2.4vw,34px);
+  --z-body:clamp(16px,1.4vw,21px);
+  --z-label:13px;
+  /* accents */
+  --z-gold:var(--gold,#e0b25a);
+  --z-line:color-mix(in srgb,var(--ink) 22%,transparent);
+}
+
+/* ---------- 2. Section rhythm (one place, equal top/bottom) ---------- */
+.stat,.nm,.about,.reels,.belt,.tb,.sun,.vis,.plans,.vg,.cta{
+  padding-block:var(--z-section-y)!important;
+}
+.reels{padding-bottom:var(--z-section-y)!important}
+
+/* ---------- 3. Type system ---------- */
+.nm__title,.tb__title,.sun__title,.vis__title,.vg__title,
+.belt .h2,.plans .h2{
+  font-family:var(--f-display);font-weight:400;text-transform:uppercase;
+  letter-spacing:0;line-height:1;
+}
+.nm__title,.sun__title,.vis__title,.vg__title{font-size:var(--z-h2)!important}
+.tb__title,.belt .h2,.plans .h2{font-size:var(--z-h2-sm)!important;line-height:1.05!important}
+.label,.vg__label,.nm__label,.vg__hint{font-family:var(--f-mono);font-size:var(--z-label)}
+
+/* ---------- 4. Panels (Missions): black veil + centred copy + 3 lines ---------- */
+.panel__veil{background:linear-gradient(0deg,rgba(0,0,0,.55),rgba(0,0,0,.25) 60%),rgba(0,0,0,.45)!important}
+.panel__bg img{object-fit:cover;object-position:50% 50%!important}
+.panel__copy{inset:0!important;max-width:none!important;background:none!important;box-shadow:none!important;border-radius:0!important;padding:0 var(--z-gutter)!important;display:grid!important;place-content:center;justify-items:center!important;text-align:center;gap:22px!important;color:#fff!important}
+.panel__copy h2{color:#fff!important;font-size:var(--z-h2-xl)!important;line-height:.98!important;max-width:15ch}
+.panel__copy .label{color:rgba(255,255,255,.85)!important}
+.panel__copy p:not(.label){color:rgba(255,255,255,.88)!important;max-width:52ch;font-size:var(--z-body)}
+.panel__links{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.panel .pill--light{background:#fff!important;color:#111!important}
+.panel .pill--light:hover{background:var(--z-gold)!important;color:#111!important}
+.panels__lines{position:absolute;inset:0;z-index:2;display:grid;grid-template-columns:repeat(4,1fr);padding:0 var(--z-gutter);pointer-events:none}
+.panels__lines i{border-left:1px solid rgba(255,255,255,.28)}
+.panels__lines i:first-child{border-left:0}
+@media (max-width:820px){
+  .panels__lines{grid-template-columns:repeat(2,1fr)}
+  .panels__lines i:nth-child(n+3){display:none}
+  .panels__lines i:nth-child(2){border-left:1px solid rgba(255,255,255,.28)}
+}
+
+/* ---------- 5. Gallery (.vg): vertical guide lines + drag carousel ---------- */
+.vg{
+  --ln:linear-gradient(var(--z-line),var(--z-line));
+  background:var(--paper);color:var(--ink);overflow:hidden;display:grid;gap:clamp(36px,5vw,72px);
+  background-image:var(--ln),var(--ln),var(--ln);background-repeat:no-repeat;background-size:1px 100%;
+  background-position:calc(var(--z-gutter) + (100% - 2*var(--z-gutter))*.25) 0,calc(var(--z-gutter) + (100% - 2*var(--z-gutter))*.5) 0,calc(var(--z-gutter) + (100% - 2*var(--z-gutter))*.75) 0;
+}
+@media (max-width:820px){.vg{background-image:var(--ln);background-position:50% 0}}
+.vg__head{padding:0 var(--z-gutter);display:grid;gap:var(--z-head-gap);justify-items:center;text-align:center}
+.vg__label{color:var(--muted)}
+.vg__rows{display:grid;gap:20px}
+.vg__row{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;cursor:grab;touch-action:pan-y;padding:26px 0 46px;margin:-26px 0 -46px}
+.vg__row::-webkit-scrollbar{display:none}
+.vg__row.is-drag{cursor:grabbing}
+.vg__track{display:flex;gap:var(--z-gap);width:max-content;padding:0 var(--z-gutter)}
+.vg__row figure{margin:0;flex:none;width:clamp(260px,24vw,460px);aspect-ratio:16/10;border-radius:var(--z-r-lg);overflow:hidden;background:rgba(0,0,0,.08);box-shadow:0 34px 50px -26px rgba(0,0,0,.45);transition:transform .5s var(--ease),box-shadow .5s;user-select:none;-webkit-user-drag:none}
+.vg__row figure:hover{transform:translateY(-10px);box-shadow:0 44px 60px -26px rgba(0,0,0,.55)}
+.vg__row img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;-webkit-user-drag:none;transition:transform .8s}
+.vg__row figure:hover img{transform:scale(1.06)}
+.vg__hint{text-align:left;padding:0 var(--z-gutter);letter-spacing:.08em;text-transform:uppercase;color:var(--gold-d,#8a6a2e)}
+
+/* ---------- 6. Countdown (.nm) ---------- */
+.nm{background:transparent;padding-inline:var(--z-gutter)}  /* transparent so the fixed vertical rails run through */
+.nm__box{position:relative;overflow:hidden;border-radius:6px;min-height:clamp(480px,66vh,700px);display:grid;place-items:center;max-width:var(--z-container);margin:0 auto;isolation:isolate;background:#111}
+.nm__bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;transform:scale(1.15);transition:transform 2.4s var(--ease)}
+.nm.is-in .nm__bg{transform:scale(1)}
+.nm__veil{position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(0,0,0,.5),rgba(0,0,0,.35) 45%,rgba(0,0,0,.7))}
+.nm__inner{display:grid;gap:clamp(16px,2.2vw,28px);justify-items:center;text-align:center;padding:clamp(40px,6vw,80px) var(--z-gutter);color:#fff}
+.nm__label{opacity:.85}
+.nm__title{color:#fff;max-width:16ch;margin:0}
+.nm__count{display:flex;align-items:flex-start;gap:clamp(8px,1.4vw,22px)}
+.nm__count>i{font-style:normal;font-family:var(--f-display);font-size:clamp(22px,3.6vw,50px);line-height:1.3;opacity:.7;animation:nmblink 1s steps(2,jump-none) infinite}
+@keyframes nmblink{50%{opacity:.15}}
+.nm__cell{display:grid;gap:10px;justify-items:center}
+.nm__num{position:relative;width:clamp(52px,8vw,120px);height:clamp(64px,9.6vw,148px);background:#fff;color:#6b4a14;display:grid;place-items:center;font-family:var(--f-display);font-size:clamp(34px,5.8vw,98px);line-height:1;overflow:hidden;box-shadow:0 20px 40px -20px rgba(0,0,0,.6)}
+.nm__num::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(0,0,0,.35)}
+.nm__num.tick{animation:nmflip .5s var(--ease)}
+@keyframes nmflip{0%{transform:translateY(-14%);opacity:.2}100%{transform:none;opacity:1}}
+.nm__cell>span{font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.9}
+.nm__sub{max-width:46ch;opacity:.9;font-size:var(--z-body)}
+.nm__btn{display:inline-flex;gap:10px;align-items:center;padding:16px 28px;background:#fff;color:#111;font-family:var(--f-display);text-transform:uppercase;font-size:clamp(14px,1.2vw,18px);transition:background .3s,transform .3s}
+.nm__btn:hover{background:var(--z-gold);transform:translateY(-3px)}
+.nm__label,.nm__title,.nm__count,.nm__sub,.nm__btn{opacity:0;transform:translateY(28px)}
+.nm.is-in :is(.nm__label,.nm__title,.nm__count,.nm__sub,.nm__btn){animation:nmrise .9s var(--ease) forwards}
+.nm.is-in .nm__title{animation-delay:.15s}.nm.is-in .nm__count{animation-delay:.3s}
+.nm.is-in .nm__sub{animation-delay:.45s}.nm.is-in .nm__btn{animation-delay:.6s}
+@keyframes nmrise{to{opacity:1;transform:none}}
+@media (max-width:560px){.nm__count{gap:6px}.nm__count>i{display:none}}
+
+/* Ribbon directly under Films */
+.marquee--spaced{margin-top:0!important}
+
+/* ---------- 7. CTA map card ---------- */
+.cta__more{display:grid;width:min(360px,90vw);padding:8px;margin:clamp(28px,4vw,48px) auto 0;border-radius:var(--z-r-md);background:rgba(0,0,0,.45);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.2);opacity:0;transform:translateY(40px) scale(.97)}
+.cta__more.is-in{animation:ftRise 1s var(--ease) forwards}
+.cta__map{position:relative;display:block;height:150px;border-radius:var(--z-r-sm);overflow:hidden;background:rgba(255,255,255,.1)}
+.cta__map iframe{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none}
+.cta__maplabel{position:absolute;left:10px;bottom:10px;display:inline-flex;gap:6px;align-items:center;background:#fff;color:#111;font-family:var(--f-mono);font-size:11px;padding:6px 10px;border-radius:999px;transition:background .3s,transform .3s}
+.cta__maplabel i{color:#c0392b}
+.cta__map:hover .cta__maplabel{background:var(--z-gold);transform:translateY(-2px)}
+@keyframes ftRise{from{opacity:0;transform:translateY(34px)}to{opacity:1;transform:none}}
+
+/* ---------- 8. Footer: pure black, staggered rise, wave ---------- */
+.fmq,.footer__warp,.footer::before,.footer::after{display:none!important}
+.footer{background:#000!important;background-image:none!important;color:#fff!important;padding-block:var(--z-section-y) clamp(28px,3vw,44px)!important}
+.footer h3{color:var(--z-gold)!important}
+.footer__brand p,.footer__top p,.footer__legal,.footer__legal a{color:rgba(255,255,255,.75)!important}
+.footer__top a{color:#fff!important}
+.footer__top a:hover,.footer__legal a:hover{color:var(--z-gold)!important}
+.footer__brand img{filter:brightness(0) invert(1)!important}
+.footer__top a[aria-label]{color:#fff!important;border:1px solid rgba(255,255,255,.35)!important;background:rgba(255,255,255,.08)!important;transition:transform .35s,background .3s;animation:ftFloat 4s ease-in-out infinite}
+.footer__top a[aria-label]:nth-child(2n){animation-delay:-1.3s}.footer__top a[aria-label]:nth-child(3n){animation-delay:-2.4s}
+.footer__top a[aria-label]:hover{transform:translateY(-6px) rotate(-8deg);background:var(--z-gold)!important;color:#000!important}
+.footer__top a:not([aria-label]){position:relative;transition:transform .3s,color .3s}
+.footer__top a:not([aria-label]):hover{transform:translateX(8px)}
+@keyframes ftFloat{0%,100%{translate:0 0}50%{translate:0 -4px}}
+.footer__top{padding-bottom:clamp(56px,7vw,100px)!important}
+.footer__top>div{opacity:0;transform:translateY(40px)}
+.footer.is-in .footer__top>div{animation:ftRise .9s var(--ease) forwards}
+.footer.is-in .footer__top>div:nth-child(2){animation-delay:.12s}.footer.is-in .footer__top>div:nth-child(3){animation-delay:.24s}
+.footer.is-in .footer__top>div:nth-child(4){animation-delay:.36s}.footer.is-in .footer__top>div:nth-child(5){animation-delay:.48s}
+.footer__mega{font-size:clamp(44px,11.5vw,190px)!important;line-height:1!important;margin:0 0 clamp(48px,6vw,96px)!important;padding:0!important;opacity:1!important;transform:none!important;transition:none!important;animation:none!important}
+.footer.is-in .footer__mega .ch{animation:chWave 4s ease-in-out infinite;animation-delay:calc(var(--i,0)*.1s)}
+.footer.is-in .footer__mega .ch:nth-child(2){animation-delay:.1s}.footer.is-in .footer__mega .ch:nth-child(3){animation-delay:.2s}
+.footer.is-in .footer__mega .ch:nth-child(4){animation-delay:.3s}.footer.is-in .footer__mega .ch:nth-child(5){animation-delay:.4s}
+.footer.is-in .footer__mega .ch:nth-child(6){animation-delay:.5s}.footer.is-in .footer__mega .ch:nth-child(7){animation-delay:.6s}
+.footer.is-in .footer__mega .ch:nth-child(8){animation-delay:.7s}.footer.is-in .footer__mega .ch:nth-child(9){animation-delay:.8s}
+@keyframes chWave{0%,100%{translate:0 0}50%{translate:0 -.07em}}
+.footer__legal{position:relative;z-index:3;opacity:1!important;border-top:0!important;margin-top:0!important;padding-top:8px}
+.footer__legal::before{content:"";display:block;height:1px;margin-bottom:20px;background:linear-gradient(90deg,transparent,var(--z-gold),transparent);transform:scaleX(0);transition:transform 1.4s var(--ease)}
+.footer.is-in .footer__legal::before{transform:scaleX(1)}
+
+/* ---------- 9. Reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  .cta__more,.footer__top>div,.nm :is(.nm__label,.nm__title,.nm__count,.nm__sub,.nm__btn){opacity:1!important;transform:none!important;animation:none!important}
+  .nm__bg{transform:none}
+  .nm__num.tick,.nm__count>i,.footer__top a[aria-label],.footer .ch{animation:none!important}
+}
+
+/* ---------- 12. Paragraph size: one readable body scale ---------- */
+.about__p,.belt__lead,.plans__p,.reels__lead,.sun__card p,.sun__where p,.vb__c p,.tb__left p,.panel__copy p:not(.label),.nm__sub,.cta p{
+  font-size:var(--z-body)!important;line-height:1.65!important;
+}
+.sun__card p a{font-size:inherit}
+
+/* ---------- 13. Church-life cards: readable text ---------- */
+.bcard h3{font-size:clamp(26px,2.6vw,40px)!important;margin-bottom:12px}
+.bcard p{font-size:var(--z-body)!important;line-height:1.55;max-width:38ch}
+.bcard__link{font-size:15px;margin-top:14px}
+.bcard__n{font-size:15px}
+.bcard__rib{font-size:13px!important}
+
+/* ---------- 14. About statement: same display voice as the other headings ---------- */
+.about .about__big{font-family:var(--f-display);font-weight:400;text-transform:uppercase;letter-spacing:0;line-height:1.02;font-size:clamp(34px,4.6vw,76px)!important}
+
+/* ---------- 15. Church Life: space between intro and the card row ---------- */
+.belt__head{margin-bottom:clamp(56px,7vw,110px)!important}
+
+/* ---------- 16. Church-life cards: every description is exactly 3 lines ---------- */
+.bcard p{font-size:clamp(15px,1.15vw,17px)!important;line-height:1.55!important;max-width:none!important;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden;min-height:calc(3*1.55em)}
+
+/* ---------- 17. Sunday section: dark theme ---------- */
+.sun{
+  --ln:linear-gradient(rgba(255,255,255,.12),rgba(255,255,255,.12));
+  background-color:#0e0b07!important;color:#fff;
+  background-image:var(--ln),var(--ln),var(--ln)!important;background-repeat:no-repeat!important;background-size:1px 100%!important;
+  background-position:25% 0,50% 0,75% 0!important;
+}
+@media (max-width:820px){.sun{background-image:var(--ln)!important;background-position:50% 0!important}}
+.sun .label,.sun__head .label{color:rgba(255,255,255,.7)!important}
+.sun .sun__title{color:#fff!important}
+.sun__card{background:rgba(255,255,255,.05)!important;border:1px solid rgba(255,255,255,.16)!important;box-shadow:none!important;backdrop-filter:blur(6px)}
+.sun__card h3{color:#fff!important}
+.sun__card p{color:rgba(255,255,255,.75)!important}
+.sun__card p a{color:var(--z-gold)!important}
+.sun__card--main{background:linear-gradient(160deg,#d9b36a,#9a7230)!important;border-color:transparent!important}
+.sun__card--main .sun__time,.sun__card--main h3{color:#14100a!important;-webkit-text-fill-color:#14100a!important}
+.sun__card--main p{color:rgba(20,16,10,.85)!important}
+.sun__where{background:rgba(255,255,255,.05)!important;border:1px solid rgba(255,255,255,.16)!important;color:#fff!important}
+.sun__where p{color:#fff!important}
+.sun__where .pill--dark{background:#fff!important;color:#111!important}
+.sun__where .pill--dark:hover{background:var(--z-gold)!important}
+
+.sun .sun__time{background-image:linear-gradient(90deg,#e8cf9a,#c9a25c,#e8cf9a)!important}
+.sun .sun__card--main .sun__time{background-image:none!important}
+
+/* ---------- 18. Motion + accessibility helpers ---------- */
+/* clear keyboard focus on every interactive element */
+:where(a,button,input,textarea,select,[tabindex]):focus-visible{outline:2px solid var(--z-gold);outline-offset:3px;border-radius:6px}
+
+/* ---------- 19. Church-life cards: no ribbon strip ---------- */
+.bcard__rib{display:none!important}
+
+/* ---------- 20. Tighter joins between neighbouring sections ---------- */
+.stat{padding-bottom:clamp(16px,2vw,32px)!important}
+.nm{padding-top:clamp(16px,2vw,32px)!important}

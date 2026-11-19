@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""Full blog (listing + one page per post), full Give page, hero photos + photo strips. Run: python3 tools/build_extra2.py"""
+import re, json, runpy, html as H
+g = runpy.run_path('tools/build_extra.py')
+page, pill, CTA, VISIT, WA = g['page'], g['pill'], g['CTA'], g['VISIT'], g['WA']
+R = lambda p: open(p, encoding='utf-8').read()
+
+# ---------- photo pool: the curated gallery on the homepage ----------
+G = list(dict.fromkeys(re.findall(r'lh3\.googleusercontent\.com/pw/([^=\'"]+)=w900', R('index.html'))))
+def gp(i, w=1400): return 'https://lh3.googleusercontent.com/pw/%s=w%d' % (G[i % len(G)], w)
+def hero(i, alt):
+    if isinstance(i, str) and i.startswith('yt:'):
+        v = i[3:]
+        return '<div class="zphoto zphoto--video" data-reveal><button type="button" class="zplay" data-vid="%s" aria-label="Play video: %s"><img loading="eager" decoding="async" referrerpolicy="no-referrer" src="https://i.ytimg.com/vi/%s/maxresdefault.jpg" alt="%s"><i class="bi bi-play-fill"></i></button></div>' % (v, alt, v, alt)
+    if isinstance(i, str):
+        return '<div class="zphoto" data-reveal><img loading="eager" decoding="async" data-parallax src="%s" alt="%s"></div>' % (i, alt)
+    return ('<div class="zphoto" data-reveal><img loading="eager" decoding="async" referrerpolicy="no-referrer" data-parallax src="%s" alt="%s"></div>' % (gp(i, 2000), alt))
+def strip(start, n=8):
+    items = ''.join('<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="%s" alt="">' % gp(start + k * 3, 700) for k in range(n))
+    return '<section class="zstrip" aria-hidden="true"><div class="zstrip__t">%s%s</div></section>' % (items, items)
+
+# ---------- blog data ----------
+posts_json = {}
+for f in ('tools/posts1.json', 'tools/posts2.json', 'tools/posts3.json'):
+    posts_json.update(json.load(open(f, encoding='utf-8')))
+META = [  # slug, title, date, image id, summary, author
+ ('water-all-around', 'Water All-Around', 'Aug 11, 2021', 'f3a51c_ba69ad6b9bd44440b2ef68284c81b1e0~mv2.png', 'Remember that passage from Jeremiah 17 which talks of the person who trusts in God being like a tree planted by streams of water?', 'Christine Jayakaran'),
+ ('online-yet-offline', 'Online Yet Offline', 'Apr 12, 2021', 'f3a51c_951923f6ff8c4f01a4843e3d93faf569~mv2.png', "It's time we all take a chance again at church. We can no longer say that we are hurt by the church or are afraid of relationships.", 'Gershom'),
+ ('leaving-a-legacy-~-part-2', 'Leaving a Legacy ~ Part 2', 'Jan 24, 2021', 'f3a51c_9ca6189d2d664c2ca58719264432c0c0~mv2.jpg', 'If we want the work of our lives to count for eternity, we need to build them the way Christ our master requires of us.', 'Sunithy Jayakaran'),
+ ('leaving-a-legacy-part-1', 'Leaving a Legacy ~ Part 1', 'Dec 8, 2020', 'f3a51c_7fdf009ea7f84e05961030bbf6c1984e~mv2.jpg', 'Your legacy begins in your heart and your relationship with God.', 'Sunithy Jayakaran'),
+ ('navigating-finances-during-lockdown', 'Navigating Finances During Lockdown', 'Aug 4, 2020', 'f3a51c_a1acfd4af0f04b5998af3c08925758f8~mv2.png', 'In a nutshell, we need to manage with the available resources. It is nothing but prioritising between needs & wants.', 'Daniel S'),
+ ('a-letter-to-my-30-year-old-self', 'A Letter to My 30 Year Old Self', 'Aug 4, 2020', 'f3a51c_1518b2eb02ec45fd98951d2fbd16c924~mv2.png', 'Thirty, we could write a book, but for now, thank you for being a chapter in mine. A chapter that tells a story of youth, uncertainty & hope.', 'Kathy Samuel Njoroge'),
+ ('the-cross-today', 'The Cross Today', 'Aug 3, 2020', 'f3a51c_096b2f67c4f440e5ab412f6f35ef856f~mv2.png', 'The cross of Jesus Christ matters more today than it ever has. He is that promised Messiah: the Way, the Truth and the Life.', 'Christina Stanley'),
+ ('articulate-your-pain', 'Articulate Your Pain', 'Aug 3, 2020', 'f3a51c_480edfa0b5564f9d9622d76cd5f2a2b5~mv2.png', 'Whatever your pain looks like today, it matters only what you do with that pain. Will you speak up and get your help from Jesus?', 'We Are Zion'),
+ ('gen-l-onely-and-love', 'Gen (L)onely and Love', 'Aug 3, 2020', 'f3a51c_b551d5dc61ab4271b3140b66605d1364~mv2.png', 'This Valentine’s Day, decide to be your own hero. Defend your own honour, accept your faults, have unwavering loyalty to your own heart.', 'Kerri Njoroge'),
+ ('our-country-our-responsibility', 'Our Country + Our Responsibility', 'Aug 3, 2020', 'f3a51c_20622a34190d4a3b8b5d56a537b15d5e~mv2.png', 'Position of leadership is a lonely place to be in. As those who follow the Lord Jesus, it is our duty to pray for our leaders.', 'Victor Jayakaran'),
+ ('a-year-of-prioritising-god-2020', 'A Year of Prioritising God 2020', 'Aug 3, 2020', 'f3a51c_09e7b3e1af314393aa66fa8d41f71dcb~mv2.png', 'A new year is all about promises, resolutions & hope for a better year ahead. So how do we achieve it?', 'Rachel Merwin'),
+ ('ad-went', 'Ad-went', 'Aug 3, 2020', 'f3a51c_c33697780bd44ff596925fba2ae25ce3~mv2.png', 'This season of Advent is like looking from a vantage point at the old and new with gratitude and humility knowing Jesus holds everything.', 'We Are Zion'),
+]
+def fname(slug): return 'blog-' + slug.replace('~-', '').replace('~', '') + '.html'
+def img(i, w, h): return 'https://static.wixstatic.com/media/%s/v1/fill/w_%d,h_%d,al_c,q_85/post.jpg' % (i, w, h)
+def words(slug): return sum(len(t.split()) for k, t in posts_json[slug] if k in ('p', 'h2', 'blockquote', 'li', 'verse'))
+def mins(slug): return max(2, round(words(slug) / 200))
+E = H.escape
+
+def card(m, big=False):
+    s, t, d, i, sm, a = m
+    return ('<a class="zcard%s" href="%s" data-reveal><span class="zcard__img"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="%s" alt="%s"></span>'
+            '<span class="zcard__m">%s · %d min read</span><h3>%s</h3><p>%s</p><span class="zcard__a">By %s <i class="bi bi-arrow-up-right"></i></span></a>'
+            % (' zcard--big' if big else '', fname(s), img(i, 1100 if big else 800, 700 if big else 520), E(t), d, mins(s), E(t), E(sm), E(a)))
+
+blog = '''
+<section class="ph"><p class="label" data-reveal>(Blog)</p><h1 class="ph__title" data-reveal>Stories and thoughts.</h1>
+<p class="ph__lead" data-reveal>Faith, finances, relearning and Christmas: articles written by our church family.</p></section>
+<section class="zs"><div class="zs__in"><p class="label" data-reveal>(Latest)</p>''' + card(META[0], True) + '''</div></section>
+<section class="zs zs--tint"><div class="zs__in"><p class="label" data-reveal>(All articles)</p><div class="zcards">''' + ''.join(card(m) for m in META[1:]) + '''</div></div></section>
+''' + strip(2) + CTA('Say hello.', 'Message us on WhatsApp and tell us what you thought.', pill('Message us', WA, 'pill--light') + pill('Visit', 'contact.html', 'pill--ghost', False))
+page('blog.html', 'Blog', 'Articles on faith, finances and relearning from the We Are Zion church family.', blog, 'blog.html')
+
+# ---------- individual posts ----------
+for n, m in enumerate(META):
+    s, t, d, i, sm, a = m
+    body, toc = [], []
+    first = True
+    for k, x in posts_json[s]:
+        if k == 'p':
+            body.append('<p%s>%s</p>' % (' class="drop"' if first else '', E(x))); first = False
+        elif k == 'h2':
+            hid = 'h%d' % len(toc); toc.append((hid, x)); body.append('<h2 id="%s">%s</h2>' % (hid, E(x)))
+        elif k == 'blockquote':
+            body.append('<blockquote%s>%s</blockquote>' % (' class="long"' if len(x) > 160 else '', E(x)))
+        elif k == 'li':
+            body.append('<ul><li>%s</li></ul>' % E(x))
+        elif k == 'verse':
+            body.append('<p class="verse">%s</p>' % E(x).replace('\n', '<br>'))
+        elif k == 'by':
+            body.append('<p class="byline">%s</p>' % E(x))
+    tocH = ('<nav class="ztoc" aria-label="In this article"><span class="label">(In this article)</span>%s</nav>' % ''.join('<a href="#%s">%s</a>' % (h, E(x)) for h, x in toc)) if len(toc) >= 2 else ''
+    prev = META[n - 1] if n > 0 else None
+    nxt = META[n + 1] if n < len(META) - 1 else None
+    pn = ''
+    if prev: pn += '<a class="zpn zpn--prev" href="%s"><span>Newer</span><b>%s</b></a>' % (fname(prev[0]), E(prev[1]))
+    if nxt: pn += '<a class="zpn zpn--next" href="%s"><span>Older</span><b>%s</b></a>' % (fname(nxt[0]), E(nxt[1]))
+    rel = [x for x in META if x[0] != s]
+    rel = (rel[n:] + rel[:n])[:3]
+    art = '''
+<div class="zprog" aria-hidden="true"><i></i></div>
+<section class="ph zpost-h"><a class="zback" href="blog.html" data-reveal><i class="bi bi-arrow-left"></i> All articles</a>
+<h1 class="ph__title zpost-h__t" data-reveal>%s</h1>
+<p class="zmeta" data-reveal>%s · %d min read · By %s</p></section>
+<div class="zs__in"><figure class="zphoto zphoto--post" data-reveal><img loading="eager" decoding="async" referrerpolicy="no-referrer" data-parallax src="%s" alt="%s"></figure></div>
+<section class="zs zart"><div class="zs__in zart__grid">%s<article class="zart__body">%s<aside class="zauthor"><span class="zauthor__av">%s</span><div><b>Written by %s</b><p>From the We Are Zion family in Chennai. Join us on a Sunday, we would love to meet you.</p><a href="about.html">About our church <i class="bi bi-arrow-right"></i></a></div></aside><div class="zshare"><span>Share</span><a href="https://api.whatsapp.com/send?text=%s" target="_blank" rel="noopener">WhatsApp</a><button type="button" data-copy="">Copy link</button></div></article></div></section><script>(function(){var l=[].slice.call(document.querySelectorAll('.ztoc a'));if(!l.length||!('IntersectionObserver' in window))return;var m={};l.forEach(function(a){m[a.getAttribute('href').slice(1)]=a});var o=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){l.forEach(function(a){a.classList.remove('is-on')});m[e.target.id].classList.add('is-on')}})},{rootMargin:'-20%% 0px -70%% 0px'});document.querySelectorAll('.zart__body h2[id]').forEach(function(h){o.observe(h)})})();</script>
+<section class="zs"><div class="zs__in zpns">%s</div></section>
+<section class="zs zs--tint"><div class="zs__in"><p class="label" data-reveal>(Keep reading)</p><div class="zcards">%s</div></div></section>
+''' % (E(t), d, mins(s), E(a), img(i, 1800, 1000), E(t), tocH, '\n'.join(body), E(a)[:1].upper(), E(a), E(t).replace(' ', '%20'), pn, ''.join(card(x) for x in rel))
+    art += strip(n * 2 + 1) + CTA('Join us on a Sunday.', 'Youth at 07:30 AM, the main gathering at 09:30 AM and church online at 06:00 PM.', pill('Visit', 'contact.html', 'pill--light', False) + pill('WhatsApp', WA, 'pill--ghost'))
+    page(fname(s), t, sm, art, 'blog.html')
+
+# ---------- Give (complete details on the page) ----------
+QR = 'https://static.wixstatic.com/media/f3a51c_e0442f91ef91444fb92f83ebf90f7ff7~mv2.png'
+def row(l, v, copy=True):
+    c = '<button type="button" class="zcopy" data-copy="%s" aria-label="Copy %s">Copy</button>' % (E(v), E(l)) if copy else ''
+    return '<div class="zrow"><dt>%s</dt><dd>%s</dd>%s</div>' % (l, E(v), c)
+give = '''
+<section class="ph ph--center"><p class="label" data-reveal>(We give)</p><h1 class="ph__title" data-reveal>We can never out-give God.</h1>
+<p class="ph__lead" data-reveal>He is the giver of everything we have, big or small. Our giving is therefore an act of worship and thanksgiving to Him.</p></section>
+''' + '''
+<section class="zs"><div class="zs__in zscripture"><blockquote data-reveal>&ldquo;Bring the full tithe into the storehouse, that there may be food in my house. And thereby put me to the test, says the Lord of hosts, if I will not open the windows of heaven for you and pour down for you a blessing until there is no more need.&rdquo;<cite>Malachi 3:10 (ESV)</cite></blockquote></div></section>
+<section class="zs zs--tint"><div class="zs__in"><p class="label" data-reveal>(3 easy ways to give)</p><h2 class="ztitle" data-reveal>Giving online is quick, easy and secure.</h2>
+<div class="zways3">
+ <article data-reveal><b>01</b><h3>Direct link</h3><p>Online giving details are shared by our team. Message us and we will help you give securely.</p>''' + pill('Ask how to give', 'contact.html', ext=False) + '''</article>
+ <article data-reveal><b>02</b><h3>Bank transfer</h3><p>Direct bank transfers via NEFT / IMPS. The details are:</p><dl class="zdl">''' + row('Account number', '920020019510373') + row('Bank IFSC', 'UTIB0001566') + row('Bank', 'AXIS Bank, Thoraipakkam', False) + row('Account name', 'WE ARE ZION') + row('Account email', 'wearezion.co@gmail.com') + '''</dl></article>
+ <article data-reveal><b>03</b><h3>UPI</h3><p>Scan the UPI code and give using your preferred UPI app.</p><figure class="zqr"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="''' + QR + '''" alt="UPI QR code for We Are Zion"></figure></article>
+</div></div></section>
+''' + strip(5) + CTA('Questions about giving?', 'Write to us or message us on WhatsApp and we will be happy to help.', pill('Email us', 'mailto:wearezion.co@gmail.com', 'pill--light', False) + pill('WhatsApp', WA, 'pill--ghost')) + '''
+<script>(function(){document.addEventListener('click',function(e){var b=e.target.closest('[data-copy]');if(!b)return;var v=b.getAttribute('data-copy')||location.href;(navigator.clipboard?navigator.clipboard.writeText(v):Promise.reject()).catch(function(){var t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();try{document.execCommand('copy')}catch(x){}t.remove()});var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o},1400)})})();</script>'''
+MQ = '<section class="zmarq" aria-hidden="true"><div class="zmarq__t">' + ('<span>We can never out-give God</span><i>&#10022;</i>' * 8) + '</div><div class="zmarq__t">' + ('<span>Give &middot; Worship &middot; Thank Him</span><i>&#10022;</i>' * 8) + '</div></section>'
+i = give.index('</section>', give.index('zscripture')) + len('</section>')
+give = give[:i] + '\n' + MQ + give[i:]
+give = give.replace('<h1 class="ph__title" data-reveal>', '<h1 class="ph__title">', 1).replace('<blockquote data-reveal>', '<blockquote>', 1).replace('<article data-reveal><b>', '<article><b>').replace('</article>\n', '</article>\n')
+give += '<script src="js/give.js?v=3"></script>'
+page('give.html', 'Give', 'We can never out-give God. Give online, by bank transfer (NEFT/IMPS) or UPI to We Are Zion.', give, 'give.html')
+
+# ---------- hero photo + strip for the other pages ----------
+def inject(fn, heroidx, alt, stripidx=None):
+    s = R(fn)
+    a = s.index('<main id="main">'); e = s.index('</section>', a) + 10
+    s = s[:e] + '\n' + hero(heroidx, alt) + s[e:]
+    if stripidx is not None:
+        j = s.index('<section class="zs zs--dark zcta">') if '<section class="zs zs--dark zcta">' in s else s.index('</main>')
+        s = s[:j] + strip(stripidx) + '\n' + s[j:]
+    open(fn, 'w', encoding='utf-8').write(s)
+inject('about.html', 'assets/images/about-group.jpg', 'The We Are Zion church family together', 9)
+inject('church-life.html', 'assets/images/church-hero.jpg', 'Welcome at a We Are Zion gathering', 12)
+inject('missions.html', 14, 'We Are Zion serving together', 1)
+inject('contact.html', 26, 'Sunday gathering at We Are Zion', 7)
+inject('vod.html', 'yt:atjAuH2Baow', 'Rains Over a Remnant | We Are Zion', 6)
+inject('bible-plan.html', 'https://static.wixstatic.com/media/f3a51c_3d4c0824f8894405b8889584eeb71537~mv2.jpg/v1/fill/w_1600,h_900,al_c,q_85/bible-plan.jpg', 'Beating Anxiety At Its Own Game, a We Are Zion Bible plan', 10)
+def strip_only(fn, idx):
+    s = R(fn); j = s.index('<section class="zs zs--dark zcta">'); open(fn, 'w', encoding='utf-8').write(s[:j] + strip(idx) + '\n' + s[j:])
+strip_only('links.html', 13); strip_only('podcast.html', 4)
+
+# ---------- Events ----------
+IGURL = 'https://www.instagram.com/wearezion.in/'
+tiles = ''.join('<button type="button" class="zev__t" data-full="%s" data-reveal><img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="%s" alt="Christmas Carol at We Are Zion, photo %d"></button>' % (gp(i, 2000), gp(i, 800), i + 1) for i in range(len(G)))
+events = '''
+<section class="ph"><p class="label" data-reveal>(Events)</p><h1 class="ph__title" data-reveal>Moments we gather.</h1>
+<p class="ph__lead" data-reveal>Beyond Sundays, we come together to celebrate, to worship and to tell the story of Jesus. Here is a look at our latest event.</p></section>
+<section class="zs"><div class="zs__in zev__feat">
+ <div class="zev__txt"><p class="label" data-reveal>(Featured event)</p><h2 class="ztitle" data-reveal>Christmas Carol.</h2>
+ <ul class="zev__facts" data-reveal><li><i class="bi bi-calendar-event"></i><span>21 December 2025</span></li><li><i class="bi bi-geo-alt"></i><span>The Upper Room Creative Arts Center, Thoraipakkam (OMR)</span></li></ul>
+ <p class="zlead" data-reveal>A Christmas gathering of carols, a play and worship, shared by our church family.</p>
+</div>
+ <div class="zev__collage" data-reveal><figure class="c1"><img loading="eager" decoding="async" referrerpolicy="no-referrer" src="''' + gp(24, 1000) + '''" alt="Nativity scene at the Christmas Carol"></figure><figure class="c2"><img loading="eager" decoding="async" referrerpolicy="no-referrer" src="''' + gp(6, 1000) + '''" alt="The We Are Zion family on stage at the Christmas Carol"></figure><figure class="c3"><img loading="eager" decoding="async" referrerpolicy="no-referrer" src="''' + gp(21, 1000) + '''" alt="Sharing a message at the Christmas Carol"></figure></div>
+</div></section>
+<section class="zs"><div class="zs__in zev__more"><p class="label" data-reveal>(More events)</p><h2 class="ztitle" data-reveal>More to come.</h2><p class="zlead" data-reveal>New events are shared on our Instagram first. Follow along so you never miss a gathering.</p><div data-reveal>''' + pill('Follow @wearezion.in', IGURL) + '''</div></div></section>
+''' + VISIT + '''
+''' 
+page('events.html', 'Events', 'Events at We Are Zion Chennai: photos from our Christmas Carol and more.', events, 'events.html')
+strip_only('events.html', 7)
+
+exec(open('tools/legal_pages.py',encoding='utf-8').read())
+exec(open('tools/local_pages.py',encoding='utf-8').read())
+print('extra2 built', len(G), 'photos')

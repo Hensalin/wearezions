@@ -1,0 +1,35 @@
+# Local landing page: "Church in OMR, Chennai". Facts only (all taken from the site's verified Sunday times / venue / contact details).
+MAPS = 'https://goo.gl/maps/nTNtHUESCyd52Znw9'
+WA = 'https://api.whatsapp.com/send?phone=919600089403'
+
+_omr = (
+ '<section class="ph"><p class="label" data-reveal>(Thoraipakkam &middot; OMR)</p>'
+ '<h1 class="ph__title" data-reveal>Church in OMR, Chennai.</h1>'
+ '<p class="ph__lead" data-reveal>We Are Zion is a multi-generational, multi-cultural church that meets every Sunday at The Upper Room Creative Arts Center, '
+ 'Thoraipakkam, on Old Mahabalipuram Road (OMR), Chennai. Everyone is welcome.</p></section>'
+
+ '<section class="zs"><div class="zs__in"><p class="label" data-reveal>(Quick facts)</p><h2 class="ztitle" data-reveal>Visit us this Sunday.</h2>'
+ '<ul class="zev__facts zfacts" data-reveal>'
+ '<li><i class="bi bi-building"></i><span><b>Church:</b> We Are Zion, Chennai, Tamil Nadu, India</span></li>'
+ '<li><i class="bi bi-geo-alt"></i><span><b>Where:</b> The Upper Room Creative Arts Center, Thoraipakkam (OMR), Chennai</span></li>'
+ '<li><i class="bi bi-clock"></i><span><b>Youth gathering:</b> Sundays, 07:30 AM</span></li>'
+ '<li><i class="bi bi-clock"></i><span><b>Main gathering and kids service:</b> Sundays, 09:30 AM</span></li>'
+ '<li><i class="bi bi-broadcast"></i><span><b>Church online:</b> Sundays, 06:00 PM</span></li>'
+ '<li><i class="bi bi-translate"></i><span><b>Language:</b> English</span></li>'
+ '<li><i class="bi bi-telephone"></i><span><b>Phone and WhatsApp:</b> +91 96000 89403</span></li>'
+ '</ul>'
+ '<div class="zbtns2" data-reveal>' + pill('Get directions', MAPS, 'pill--dark') + pill('Chat on WhatsApp', WA, 'pill--dark') + '</div>'
+ '</div></section>'
+
+ '<section class="zs zs--tint"><div class="zs__in"><p class="label" data-reveal>(Along OMR)</p><h2 class="ztitle" data-reveal>A church home near you.</h2>'
+ '<p class="zlead" data-reveal>If you live or work along Old Mahabalipuram Road, in places like Perungudi, Thoraipakkam, Karapakkam, Sholinganallur or Navalur, '
+ 'you are warmly invited to join us on a Sunday.</p>'
+ '<p class="zlead" data-reveal>We are a community who love Jesus and love people: hopeful, rooted in the Word and open to everyone. '
+ 'You can also <a href="about.html">read about who we are</a>, see <a href="church-life.html">church life, kids and the Alpha Course</a>, '
+ 'watch <a href="vod.html">Sunday sermons on video</a> or <a href="contact.html">contact us</a>.</p></div></section>'
+ '\n' + CTA('Come this Sunday.', 'Youth at 07:30 AM, main gathering at 09:30 AM, church online at 06:00 PM. We would love to meet you.',
+            pill('Get directions', MAPS, 'pill--light') + pill('Message us', WA, 'pill--ghost')) +
+ strip(5))
+page('church-in-omr-chennai.html', 'Church in OMR, Chennai',
+     'Looking for a church in OMR, Chennai? We Are Zion meets every Sunday in Thoraipakkam: youth 7:30 AM, main gathering 9:30 AM, church online 6 PM.',
+     _omr, '')

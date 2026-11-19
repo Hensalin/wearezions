@@ -1,0 +1,263 @@
+#!/usr/bin/env python3
+"""SEO / AEO / GEO post-processor. Run from project root:  python3 tools/build_seo.py
+Rebuilds every page (build_extra2.py), then rewrites each page's <head> metadata, adds verified-fact FAQs,
+JSON-LD, sitemap.xml and robots.txt. Only facts already present on this site are used."""
+import re, json, html, runpy, datetime, os
+
+BASE = 'https://www.wearezion.co/'   # <- change to the domain this site will be published on
+TODAY = datetime.date.today().isoformat()
+g = runpy.run_path('tools/build_extra2.py')
+META = g['META']
+
+def R(f): return open(f, encoding='utf-8').read()
+def W(f, s): open(f, 'w', encoding='utf-8', newline='\n').write(s)
+def esc(s): return html.escape(s, quote=True)
+
+# ---- move blog posts into /blogs/ (rewrite relative paths one level up)
+os.makedirs('blogs', exist_ok=True)
+_posts = sorted(f for f in os.listdir('.') if f.startswith('blog-') and f.endswith('.html'))
+_map = {f: 'blogs/' + f[5:] for f in _posts}
+_skip = re.compile(r'^(?:[a-z][a-z0-9+.-]*:|//|#|\.\./)', re.I)
+def _up(m):
+    return m.group(1) + (m.group(2) if _skip.match(m.group(2)) else '../' + m.group(2)) + m.group(3)
+for f in _posts:
+    s = R(f)
+    for old, new in _map.items(): s = s.replace(old, new)
+    s = re.sub(r'(\b(?:href|src|poster)=")([^"]*)(")', _up, s)
+    s = re.sub(r'(url\()([^)\'"]+)(\))', lambda m: m.group(1) + (m.group(2) if _skip.match(m.group(2)) else '../' + m.group(2)) + m.group(3), s)
+    W(f, s); os.replace(f, _map[f])
+for f in os.listdir('.'):
+    if f.endswith('.html') and not f.startswith('blog-'):
+        s = R(f); t = s
+        for old, new in _map.items(): t = t.replace(old, new)
+        if t != s: W(f, t)
+
+
+OG_IMG = 'https://static.wixstatic.com/media/f3a51c_750f18054c7540a0aeb31c0d798ffade~mv2.jpg/v1/fill/w_1200,h_630,al_c,q_85/we-are-zion.jpg'
+VERIFIED_HOURS = 'Youth service 07:30 AM, main service and kids service 09:30 AM, church online 06:00 PM, every Sunday.'
+
+# --- the Church entity: taken from the verified block already in index.html
+src_index = R('index.html')
+church = None
+for m in re.finditer(r'<script type="application/ld\+json">(.*?)</script>', src_index, re.S):
+    try:
+        d = json.loads(m.group(1))
+    except Exception:
+        continue
+    for n in (d.get('@graph', [d]) if isinstance(d, dict) else []):
+        if n.get('@type') == 'Church':
+            church = n
+assert church, 'Church JSON-LD not found in index.html'
+church['@id'] = BASE + '#church'
+church['url'] = BASE
+church.setdefault('image', OG_IMG)
+
+PAGES = {  # file: (title, description, primary keyword, secondary/long-tail, schema type, crumb name)
+ 'index.html': ('We Are Zion Church | Chennai | English Services',
+   'We Are Zion is a multi-generational, multi-cultural church in Thoraipakkam (OMR), Chennai. Join us every Sunday: youth 7:30 AM, main service 9:30 AM.',
+   'church in Chennai', 'English church Chennai; Thoraipakkam church; OMR church; Sunday service Chennai', 'WebPage', 'Home'),
+ 'about.html': ('About We Are Zion | A Hopeful Church in Chennai',
+   'We are a multi-generational and multi-cultural community in Chennai who love Jesus and love people. Learn our vision: hopeful, rooted and inspired.',
+   'about We Are Zion church', 'multi-generational church Chennai; multi-cultural church Chennai; church vision', 'AboutPage', 'About'),
+ 'church-life.html': ('Church Life | Prayer, Kids & Alpha Course in Chennai',
+   'Stop Drop & Pray midweek prayer, wearezion Kids and the Alpha Course. See how to get involved at We Are Zion, Thoraipakkam (OMR), Chennai.',
+   'church life Chennai', 'Alpha Course Chennai; kids church Chennai; church prayer meeting Chennai', 'WebPage', 'Church life'),
+ 'missions.html': ('Missions | Care, Digital & Creative Outreach | We Are Zion',
+   'We are a missional church: caring for the vulnerable with NGO partners, publishing Bible plans in many languages and sharing the Gospel through the creative arts.',
+   'missional church Chennai', 'church NGO partnership Chennai; digital missions Bible plans; creative outreach', 'WebPage', 'Missions'),
+ 'church-in-omr-chennai.html': ('Church in OMR, Chennai | We Are Zion, Thoraipakkam',
+   'Looking for a church in OMR, Chennai? We Are Zion meets every Sunday in Thoraipakkam: youth 7:30 AM, main service 9:30 AM, church online 6 PM.',
+   'church in OMR Chennai', 'church in Thoraipakkam; English church OMR; church near Sholinganallur; church near Perungudi; Sunday service OMR', 'WebPage', 'Church in OMR, Chennai'),
+ 'contact.html': ('Visit & Contact | We Are Zion, Thoraipakkam (OMR) Chennai',
+   'Visit We Are Zion every Sunday at the Upper Room Creative Arts Center, Thoraipakkam (OMR), Chennai. Service times, address, phone and WhatsApp.',
+   'church Thoraipakkam OMR', 'church service timings Chennai; Sunday church near OMR; church address Thoraipakkam', 'ContactPage', 'Visit & contact'),
+ 'bible-plan.html': ('Bible Plans in English, Hindi, Telugu, Tamil & More | We Are Zion',
+   'Free YouVersion Bible plans published by We Are Zion in English, Hindi, Telugu, Tamil, Bengali and more. Read on your own or with friends.',
+   'Bible plans', 'YouVersion Bible plan; Bible plan in Tamil; Bible plan in Telugu; Bible plan in Hindi', 'CollectionPage', 'Bible plans'),
+ 'blog.html': ('Blog | Faith, Finances & Christmas Articles | We Are Zion',
+   'Articles written by the We Are Zion church family in Chennai on faith, finances, relearning church and Christmas. Read all 12 posts.',
+   'Christian blog Chennai', 'church blog; Christian articles on faith; Christmas Advent reflection', 'CollectionPage', 'Blog'),
+ 'podcast.html': ('Sermon Podcast | We Are Zion Church Chennai',
+   'Listen to the We Are Zion sermon podcast: messages from a community of Christ followers in Chennai, India. Search and play every episode.',
+   'sermon podcast', 'church podcast Chennai; Christian sermon podcast India', 'CollectionPage', 'Podcast'),
+ 'vod.html': ('Sunday Sermons on Video | We Are Zion Chennai',
+   'Watch We Are Zion Sunday sermon videos any time, plus creative Gospel films. Search the full library; every video opens on YouTube.',
+   'sermon videos', 'Sunday sermons online; church online Chennai; Christian short films', 'CollectionPage', 'Sermon videos'),
+ 'events.html': ('Events | Christmas Carol & Church Gatherings | We Are Zion',
+   'Beyond Sundays, We Are Zion gathers to celebrate and worship. See our Christmas Carol, held at the Upper Room Creative Arts Center, Thoraipakkam (OMR).',
+   'church events Chennai', 'Christmas carol Chennai; Christmas service OMR', 'CollectionPage', 'Events'),
+ 'give.html': ('Give | We Can Never Out-Give God | We Are Zion',
+   'Giving is an act of worship and thanksgiving. Learn the ways to give to We Are Zion Church in Chennai.',
+   'give to church', 'tithe and offering; online giving church Chennai', 'WebPage', 'Give'),
+ 'cookies.html': ('Cookie Policy | We Are Zion',
+   'The We Are Zion cookie policy: what cookies are, how our websites use them and how to manage your choices.',
+   'cookie policy', '', 'WebPage', 'Cookie policy'),
+ 'privacy.html': ('Privacy Statement | We Are Zion',
+   'The We Are Zion privacy statement: what information we collect, how we use and protect it, and how to contact us.',
+   'privacy statement', '', 'WebPage', 'Privacy statement'),
+ 'links.html': ('Links | Everything We Are Zion in One Place',
+   'Quick links to We Are Zion: live and sermons on YouTube, podcast, Bible plans, giving, WhatsApp, Instagram, Facebook, Spotify and Apple Podcasts.',
+   'We Are Zion links', 'We Are Zion YouTube; We Are Zion Instagram', 'WebPage', 'Links'),
+}
+
+FAQ = {
+ 'church-in-omr-chennai.html': [
+  ('Is there a church in OMR, Chennai?', 'Yes. We Are Zion is a multi-generational, multi-cultural church that meets every Sunday at The Upper Room Creative Arts Center, Thoraipakkam, on Old Mahabalipuram Road (OMR), Chennai.'),
+  ('What time is the Sunday service at We Are Zion in Thoraipakkam?', 'Youth service at 07:30 AM, main service and kids service at 09:30 AM, and church online at 06:00 PM, every Sunday.'),
+  ('Are the services in English?', 'Yes. We Are Zion is an English-language church in Chennai, and everyone is welcome.'),
+  ('Is there a kids service?', 'Yes. wearezion Kids meets every Sunday at 09:30 AM, at the same time as the main service.'),
+  ('Can I watch We Are Zion church online?', 'Yes. Church online is every Sunday at 06:00 PM, and Sunday sermons are available on video on our website and YouTube channel.'),
+  ('How do I contact the church?', 'Call or message us on WhatsApp at +91 96000 89403, or email wearezion.co@gmail.com.')],
+ 'contact.html': [
+  ('What time are the Sunday services at We Are Zion?', 'Every Sunday we have a youth service at 07:30 AM, our main service at 09:30 AM (with a kids service at the same time) and church online at 06:00 PM.'),
+  ('Where is We Are Zion Church in Chennai?', 'We meet at The Upper Room Creative Arts Center, Thoraipakkam (OMR), Chennai, Tamil Nadu, India.'),
+  ('Is there a kids service?', 'Yes. wearezion Kids meets every Sunday at 09:30 AM at the same location, at the same time as the main service.'),
+  ('How can I contact We Are Zion?', 'Call +91 96000 89403 or message us on WhatsApp. You can also use the Get directions button on this page.')],
+ 'church-life.html': [
+  ('What is Stop Drop & Pray?', 'It is our midweek prayer meeting, where we pray for each other, our church and the needs of our city and country. Get in touch with us for details.'),
+  ('When does wearezion Kids meet?', 'Every Sunday at 09:30 AM at The Upper Room Creative Arts Center, at the same time as the main service.'),
+  ('What is the Alpha Course?', 'The Alpha newcomer series, together with premarital and marriage courses, runs periodically through the year to edify and encourage church members and newcomers.'),
+  ('I am new. Where do I start?', 'Come this Sunday: youth at 07:30 AM, main service at 09:30 AM or church online at 06:00 PM. The Alpha Course is a good place to begin.')],
+ 'bible-plan.html': [
+  ('What are the We Are Zion Bible plans?', 'They are Bible reading plans published by our church on the YouVersion Bible app, which you can do by yourself or with friends.'),
+  ('Which languages are the plans available in?', 'We publish plans in several languages, including English, Hindi, Telugu, Tamil and Bengali. Use the language tabs on this page to filter them.')],
+}
+
+CRUMB = lambda f, name: [('Home', BASE)] + ([] if f == 'index.html' else [(name, BASE + f)])
+
+def parse_posts():
+    out = {}
+    for n in sorted(os.listdir('blogs')):
+        f = 'blogs/' + n
+        if not n.endswith('.html'): continue
+        s = R(f)
+        h = html.unescape(re.sub(r'<[^>]+>', '', re.search(r'<h1[^>]*>(.*?)</h1>', s, re.S).group(1))).strip()
+        mt = re.search(r'class="zmeta"[^>]*>([^<]+)<', s)
+        meta = html.unescape(mt.group(1)) if mt else ''
+        m = next((x for x in META if html.unescape(x[1]).strip() == h), None)
+        out[f] = (h, meta, m)
+    return out
+
+def iso(d):
+    return datetime.datetime.strptime(d, '%b %d, %Y').date().isoformat()
+
+def trim(s, n=155):
+    s = re.sub(r'\s+', ' ', html.unescape(s)).strip()
+    return s if len(s) <= n else s[:n - 1].rsplit(' ', 1)[0].rstrip(',;:') + '…'
+
+def ld(nodes):
+    return '<script type="application/ld+json">' + json.dumps({'@context': 'https://schema.org', '@graph': nodes}, ensure_ascii=False) + '</script>'
+
+def build_head(f, title, desc, image, kind='website', extra_og='', nodes_extra=None, crumbs=None, faq=None, ptype='WebPage', date=None):
+    url = BASE if f == 'index.html' else BASE + f
+    o = ['<!-- seo -->', '<title>%s</title>' % esc(title), '<meta name="description" content="%s">' % esc(desc),
+         '<link rel="canonical" href="%s">' % url,
+         '<meta property="og:type" content="%s">' % kind, '<meta property="og:site_name" content="We Are Zion">',
+         '<meta property="og:locale" content="en_IN">', '<meta property="og:url" content="%s">' % url,
+         '<meta property="og:title" content="%s">' % esc(title), '<meta property="og:description" content="%s">' % esc(desc),
+         '<meta property="og:image" content="%s">' % esc(image), extra_og,
+         '<meta name="twitter:card" content="summary_large_image">', '<meta name="twitter:title" content="%s">' % esc(title),
+         '<meta name="twitter:description" content="%s">' % esc(desc), '<meta name="twitter:image" content="%s">' % esc(image)]
+    nodes = [dict(church)]
+    if f == 'index.html':
+        nodes.append({'@type': 'WebSite', '@id': BASE + '#website', 'url': BASE, 'name': 'We Are Zion', 'publisher': {'@id': BASE + '#church'}, 'inLanguage': 'en-IN'})
+    page = {'@type': ptype, '@id': url + '#webpage', 'url': url, 'name': title, 'description': desc, 'inLanguage': 'en-IN',
+            'isPartOf': {'@id': BASE + '#website'} if f == 'index.html' else {'@type': 'WebSite', 'name': 'We Are Zion', 'url': BASE},
+            'about': {'@id': BASE + '#church'}, 'primaryImageOfPage': {'@type': 'ImageObject', 'url': image}}
+    if crumbs and len(crumbs) > 1: page['breadcrumb'] = {'@id': url + '#breadcrumb'}
+    nodes.append(page)
+    if crumbs and len(crumbs) > 1:
+        nodes.append({'@type': 'BreadcrumbList', '@id': url + '#breadcrumb', 'itemListElement': [
+            {'@type': 'ListItem', 'position': i + 1, 'name': n, 'item': u} for i, (n, u) in enumerate(crumbs)]})
+    if faq:
+        nodes.append({'@type': 'FAQPage', '@id': url + '#faq', 'mainEntity': [
+            {'@type': 'Question', 'name': q, 'acceptedAnswer': {'@type': 'Answer', 'text': a}} for q, a in faq]})
+    nodes += nodes_extra or []
+    o.append(ld(nodes))
+    return '\n'.join(x for x in o if x)
+
+STRIP = [r'<title>.*?</title>', r'<meta name="description"[^>]*>', r'<meta name="keywords"[^>]*>', r'<meta property="(?:og|article):[^>]*>',
+         r'<meta name="twitter:[^>]*>', r'<link rel="canonical"[^>]*>', r'<script type="application/ld\+json">.*?</script>']
+
+def rewrite(f, block):
+    s = R(f)
+    i = s.index('</head>'); head, rest = s[:i], s[i:]
+    for p in STRIP: head = re.sub(p + r'\s*', '', head, flags=re.S)
+    head = head.replace('<!-- seo -->\n', '').replace('<!-- seo -->', '')
+    head = head.replace('<meta name="viewport" content="width=device-width, initial-scale=1">', '<meta name="viewport" content="width=device-width, initial-scale=1">\n' + block, 1)
+    W(f, head + rest)
+
+def faq_section(items):
+    qa = ''.join('<details data-reveal><summary>%s</summary><p>%s</p></details>' % (esc(q), esc(a)) for q, a in items)
+    return ('<section class="zs zfaq"><div class="zs__in"><p class="label" data-reveal>(Questions)</p><h2 class="ztitle" data-reveal>Good to know.</h2>'
+            '<div class="zfaq__l">%s</div></div></section>\n' % qa)
+
+def add_faq(f, items):
+    s = R(f)
+    if 'class="zs zfaq"' in s: return
+    for mark in ('<section class="zs zs--dark zcta">', '<section class="zstrip"', '</main>'):
+        if mark in s:
+            s = s.replace(mark, faq_section(items) + mark, 1); break
+    W(f, s)
+
+# ---- pass 1: add FAQs (visible, real facts only)
+for f, items in FAQ.items(): add_faq(f, items)
+
+# ---- pass 2: head / schema
+report = []
+for f, (title, desc, kw, long, ptype, name) in PAGES.items():
+    if not os.path.exists(f): continue
+    block = build_head(f, title, desc, OG_IMG, crumbs=CRUMB(f, name), faq=FAQ.get(f), ptype=ptype)
+    rewrite(f, block); report.append((f, title, desc, kw, long))
+
+posts = parse_posts()
+blog_items = []
+for f, (h, meta, m) in posts.items():
+    if not m:
+        print('! no META match for', f, h); continue
+    slug, mt, d, imgid, summ, auth = m[:6]
+    img = 'https://static.wixstatic.com/media/%s/v1/fill/w_1200,h_630,al_c,q_85/post.jpg' % imgid
+    t = '%s | We Are Zion Blog' % html.unescape(h)
+    if len(t) > 62: t = '%s | We Are Zion' % html.unescape(h)
+    desc = trim(summ)
+    url = BASE + f
+    author = {'@type': 'Organization', 'name': 'We Are Zion'} if auth.strip().lower() == 'we are zion' else {'@type': 'Person', 'name': auth}
+    post = {'@type': 'BlogPosting', '@id': url + '#article', 'headline': html.unescape(h), 'description': desc, 'image': img,
+            'datePublished': iso(d), 'author': author, 'publisher': {'@id': BASE + '#church'}, 'inLanguage': 'en-IN',
+            'mainEntityOfPage': {'@id': url + '#webpage'}, 'isPartOf': {'@type': 'Blog', 'name': 'We Are Zion Blog', 'url': BASE + 'blog.html'}}
+    extra = '<meta property="article:published_time" content="%s">\n<meta property="article:author" content="%s">' % (iso(d), esc(auth))
+    block = build_head(f, t, desc, img, kind='article', extra_og=extra, nodes_extra=[post],
+                       crumbs=[('Home', BASE), ('Blog', BASE + 'blog.html'), (html.unescape(h), url)])
+    rewrite(f, block)
+    report.append((f, t, desc, 'Blog post: ' + html.unescape(h), 'author: %s; published %s' % (auth, iso(d))))
+    blog_items.append({'@type': 'BlogPosting', 'headline': html.unescape(h), 'url': url, 'datePublished': iso(d), 'author': author})
+
+# blog listing: add Blog node with its posts
+s = R('blog.html')
+blog_node = {'@type': 'Blog', '@id': BASE + 'blog.html#blog', 'name': 'We Are Zion Blog', 'url': BASE + 'blog.html', 'publisher': {'@id': BASE + '#church'}, 'blogPost': blog_items}
+s = s.replace('</script>\n', '</script>\n', 1)
+m = re.search(r'<script type="application/ld\+json">(.*?)</script>', s, re.S)
+if m:
+    d = json.loads(m.group(1)); d['@graph'].append(blog_node)
+    s = s[:m.start(1)] + json.dumps(d, ensure_ascii=False) + s[m.end(1):]
+    W('blog.html', s)
+
+# ---- sitemap / robots
+urls = [(BASE, TODAY, '1.0')] + [(BASE + f, TODAY, '0.7') for f in PAGES if f != 'index.html' and f in [r[0] for r in report]]
+urls += [(BASE + f, iso(posts[f][2][2]), '0.6') for f in posts if posts[f][2]]
+sm = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + ''.join(
+    '  <url><loc>%s</loc><lastmod>%s</lastmod><priority>%s</priority></url>\n' % u for u in urls) + '</urlset>\n'
+W('sitemap.xml', sm)
+W('robots.txt', 'User-agent: *\nAllow: /\nDisallow: /shop.html\nDisallow: /index-old.html\nDisallow: /index-before-nav.html\n\nSitemap: %ssitemap.xml\n' % BASE)
+
+# ---- keyword map (proposed targets, not measured search volumes)
+km = ['# We Are Zion: keyword map\n', 'Proposed targets, one primary per page to avoid cannibalisation. These are editorial choices, not measured search volumes or rankings.\n',
+      '| Page | Title tag | Primary | Secondary / long-tail |', '|---|---|---|---|']
+for f, t, dsc, kw, long in report:
+    km.append('| %s | %s | %s | %s |' % (f, t, kw, long))
+W('SEO-KEYWORD-MAP.md', '\n'.join(km) + '\n')
+
+print('seo done:', len(report), 'pages,', len(urls), 'sitemap urls')
+
+# ---- local SEO + GEO/AEO pass (schema enrichment, hreflang, robots for AI crawlers, llms.txt)
+exec(open('tools/build_geo.py', encoding='utf-8').read())

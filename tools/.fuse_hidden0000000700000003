@@ -1,0 +1,106 @@
+# Local SEO + GEO/AEO pass. exec'd at the end of build_seo.py (uses its R, W, BASE, PAGES, FAQ, church, TODAY).
+# Facts only: Sunday times, venue, phone and links already published on this site.
+import glob
+
+MAPS = 'https://goo.gl/maps/nTNtHUESCyd52Znw9'
+YT = 'https://www.youtube.com/channel/UCvYr0_ZuUHv-kf7ftUsuMUQ'
+OMR_PLACES = ['Thoraipakkam', 'Perungudi', 'Karapakkam', 'Sholinganallur', 'Navalur', 'Old Mahabalipuram Road (OMR)', 'Chennai']
+
+def _sunday(name, start, end, online=False):
+    loc = ({'@type': 'VirtualLocation', 'url': YT} if online else
+           {'@type': 'Place', 'name': 'The Upper Room Creative Arts Center', 'address': church['address']})
+    return {'@type': 'Event', 'name': name, 'eventAttendanceMode': 'https://schema.org/' + ('OnlineEventAttendanceMode' if online else 'OfflineEventAttendanceMode'),
+            'eventStatus': 'https://schema.org/EventScheduled', 'location': loc, 'organizer': {'@id': BASE + '#church'},
+            'startDate': TODAY + 'T' + start + ':00+05:30', 'endDate': TODAY + 'T' + end + ':00+05:30',
+            'eventSchedule': {'@type': 'Schedule', 'repeatFrequency': 'P1W', 'byDay': 'https://schema.org/Sunday',
+                              'startTime': start + ':00', 'scheduleTimezone': 'Asia/Kolkata'},
+            'inLanguage': 'en', 'isAccessibleForFree': True}
+
+EVENTS = [_sunday('We Are Zion Youth Gathering', '07:30', '09:00'),
+          _sunday('We Are Zion Main Gathering and Kids Service', '09:30', '11:30'),
+          _sunday('We Are Zion Church Online', '18:00', '19:30', online=True)]
+
+rich = dict(church)
+rich.update({
+    'keywords': 'church in Chennai, church in OMR, Thoraipakkam church, English church Chennai, Sunday service Chennai',
+    'slogan': 'Whoever finds Jesus finds life.',
+    'knowsLanguage': 'en', 'areaServed': [{'@type': 'Place', 'name': p} for p in OMR_PLACES],
+    'hasMap': MAPS,
+    'location': {'@type': 'Place', 'name': 'The Upper Room Creative Arts Center', 'hasMap': MAPS, 'address': church['address']},
+    'contactPoint': [{'@type': 'ContactPoint', 'contactType': 'visitor enquiries', 'telephone': '+91 96000 89403',
+                      'email': 'wearezion.co@gmail.com', 'availableLanguage': 'English'}],
+    'isAccessibleForFree': True, 'publicAccess': True,
+})
+SPEAK = {'@type': 'SpeakableSpecification', 'cssSelector': ['.ph__title', '.ph__lead', '.zfacts', '.zfaq summary', '.zfaq p']}
+EVENT_PAGES = {'index.html', 'contact.html', 'church-in-omr-chennai.html'}
+SPEAK_PAGES = {'index.html', 'contact.html', 'church-in-omr-chennai.html', 'church-life.html'}
+NOINDEX = {'shop.html', 'index-old.html', 'index-before-nav.html'}
+
+def enrich(f, s):
+    pat = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
+    m = pat.search(s)
+    if not m: return s
+    d = json.loads(m.group(1)); nodes = d['@graph']; name = f.split('/')[-1]
+    out = []
+    for n in nodes:
+        if n.get('@type') == 'Church':
+            x = dict(rich); x['@id'] = n['@id']; x['url'] = n['url']; out.append(x)
+        elif n.get('@type') in ('WebPage', 'AboutPage', 'ContactPage', 'CollectionPage') and name in SPEAK_PAGES:
+            n['speakable'] = SPEAK; out.append(n)
+        else: out.append(n)
+    if name in EVENT_PAGES and not any(n.get('@type') == 'Event' for n in out): out += EVENTS
+    d['@graph'] = out
+    return s[:m.start(1)] + json.dumps(d, ensure_ascii=False) + s[m.end(1):]
+
+def tune_head(f, s):
+    name = f.split('/')[-1]
+    s = s.replace('<html lang="en"', '<html lang="en-IN"', 1)
+    if 'name="geo.region"' in s: return s
+    url = BASE if name == 'index.html' else BASE + f
+    add = ['<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">',
+           '<meta name="geo.region" content="IN-TN">', '<meta name="geo.placename" content="Thoraipakkam, Chennai">',
+           '<link rel="alternate" hreflang="en-IN" href="%s">' % url, '<link rel="alternate" hreflang="x-default" href="%s">' % url]
+    return re.sub(r'(<link rel="canonical"[^>]*>)', lambda m: m.group(1) + '\n' + '\n'.join(add), s, 1) if '<link rel="canonical"' in s else s
+
+def footer_link(f, s):
+    href = ('../' if f.startswith('blogs/') else '') + 'church-in-omr-chennai.html'
+    if href in s and 'Church in OMR, Chennai</a>' in s: return s
+    new = re.sub(r'(rel="noopener">Thoraipakkam \(OMR\) ↗</a>)', r'\1<a href="%s">Church in OMR, Chennai</a>' % href, s, 1)
+    return new
+
+files = [f for f in glob.glob('*.html') + glob.glob('blogs/*.html')]
+nfoot = 0
+for f in files:
+    name = f.split('/')[-1]
+    if name in NOINDEX: continue
+    s = R(f); t = tune_head(f, enrich(f, s)); t2 = footer_link(f, t)
+    if t2 != t: nfoot += 1
+    if t2 != s: W(f, t2)
+
+# robots.txt: be explicit that search AND AI answer engines may crawl everything public
+AI_BOTS = ['GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'PerplexityBot', 'Perplexity-User', 'ClaudeBot', 'Claude-User', 'Claude-SearchBot',
+           'Google-Extended', 'Googlebot', 'Bingbot', 'Applebot', 'Applebot-Extended', 'DuckDuckBot', 'CCBot', 'Amazonbot', 'Meta-ExternalAgent']
+rb = ''.join('User-agent: %s\nAllow: /\n\n' % b for b in AI_BOTS)
+rb += 'User-agent: *\nAllow: /\nDisallow: /shop.html\nDisallow: /index-old.html\nDisallow: /index-before-nav.html\n\nSitemap: %ssitemap.xml\n' % BASE
+W('robots.txt', rb)
+
+# llms.txt / llms-full.txt: a plain-language entity summary for AI assistants
+FACTS = ('We Are Zion is a multi-generational, multi-cultural church in Thoraipakkam, on Old Mahabalipuram Road (OMR), Chennai, Tamil Nadu, India. '
+         'We meet every Sunday at The Upper Room Creative Arts Center: youth gathering 07:30 AM, main gathering and kids service 09:30 AM, church online 06:00 PM (IST). '
+         'Services are in English. Phone and WhatsApp: +91 96000 89403. Email: wearezion.co@gmail.com. Our mission: love Jesus and love people.')
+links = [('Church in OMR, Chennai', 'church-in-omr-chennai.html'), ('Visit and contact', 'contact.html'), ('About', 'about.html'),
+         ('Church life: prayer, kids, Alpha Course', 'church-life.html'), ('Sunday sermons on video', 'vod.html'), ('Sermon podcast', 'podcast.html'),
+         ('Bible plans (English, Hindi, Telugu, Tamil, Bengali and more)', 'bible-plan.html'), ('Missions', 'missions.html'), ('Events', 'events.html'),
+         ('Blog', 'blog.html'), ('Giving', 'give.html')]
+desc_of = {k: v[1] for k, v in PAGES.items()}
+llms = '# We Are Zion\n\n> %s\n\n## Key pages\n\n' % FACTS + ''.join('- [%s](%s%s): %s\n' % (t, BASE, f, desc_of.get(f, '')) for t, f in links)
+llms += '\n## Contact and profiles\n\n- Phone / WhatsApp: +91 96000 89403\n- Map: %s\n- YouTube: %s\n- Instagram: https://www.instagram.com/wearezion.in/\n- Facebook: https://www.facebook.com/wearezion.co/\n' % (MAPS, YT)
+W('llms.txt', llms)
+full = llms + '\n## Frequently asked questions\n\n'
+seen = set()
+for f in ('church-in-omr-chennai.html', 'contact.html', 'church-life.html', 'bible-plan.html'):
+    for q, a in FAQ.get(f, []):
+        if q in seen: continue
+        seen.add(q); full += '**%s**\n%s\n\n' % (q, a)
+W('llms-full.txt', full)
+print('geo done: footer link on', nfoot, 'pages; robots/llms written')
