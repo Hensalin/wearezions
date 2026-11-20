@@ -1,0 +1,9 @@
+# Files that must not be published on the website (source code, tools, notes, archives)
+server
+tools
+*.zip
+*.lnk
+*.py
+README.md
+RANKING-PLAYBOOK.md
+SEO-KEYWORD-MAP.md
